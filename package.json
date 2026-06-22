@@ -1,0 +1,6 @@
+{
+  "scripts": {
+    "build": "node -e \"console.log('Dynasty Drive static prototype ready')\""
+  },
+  "devDependencies": {}
+}

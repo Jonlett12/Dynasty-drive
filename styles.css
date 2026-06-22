@@ -1,0 +1,648 @@
+:root {
+  color-scheme: dark;
+  --bg: #0c1113;
+  --panel: #141b1e;
+  --panel-2: #192225;
+  --line: #263235;
+  --text: #eef5f0;
+  --muted: #9ba8a3;
+  --green: #23c36b;
+  --gold: #f5b84b;
+  --red: #f26363;
+  --blue: #5aa7ff;
+  --ink: #070a0b;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0;
+}
+
+button, input, select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.sidebar {
+  border-right: 1px solid var(--line);
+  background: #0a0f11;
+  padding: 20px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 30px;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: var(--green);
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.brand span, .league-card span, .league-card small, .eyebrow, .muted {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.nav {
+  display: grid;
+  gap: 8px;
+}
+
+.nav-item {
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+  padding: 0 14px;
+}
+
+.nav-item.active {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+.league-card {
+  margin-top: 26px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 14px;
+}
+
+.league-card strong {
+  display: block;
+  margin: 6px 0;
+}
+
+.main {
+  width: min(1220px, 100%);
+  margin: 0 auto;
+  padding: 22px 26px 96px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+h1, h2, h3, p {
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(28px, 3vw, 46px);
+  line-height: 1;
+}
+
+h2 {
+  font-size: 20px;
+}
+
+h3 {
+  font-size: 15px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.primary-btn, .ghost-btn, .mini-btn, .danger-btn {
+  border-radius: 8px;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  padding: 0 14px;
+  color: var(--text);
+  background: var(--panel-2);
+}
+
+.primary-btn {
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.danger-btn {
+  background: #251719;
+  color: #ffb8b8;
+  border-color: #513033;
+}
+
+.mini-btn {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.stadium {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #071012;
+  min-height: 220px;
+  margin-bottom: 18px;
+}
+
+#stadiumCanvas {
+  display: block;
+  width: 100%;
+  height: 260px;
+  position: absolute;
+  inset: 0 0 auto 0;
+  opacity: 0.34;
+  pointer-events: none;
+}
+
+.stadium-art {
+  display: block;
+  width: 100%;
+  height: 260px;
+  object-fit: cover;
+}
+
+.score-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--line);
+  background: rgba(10, 15, 17, 0.9);
+}
+
+.score-strip div {
+  padding: 14px 16px;
+  border-right: 1px solid var(--line);
+}
+
+.score-strip div:last-child {
+  border-right: 0;
+}
+
+.score-strip span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.score-strip strong {
+  display: block;
+  font-size: 23px;
+  margin-top: 3px;
+}
+
+.view {
+  display: none;
+}
+
+.view.active {
+  display: block;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 14px;
+}
+
+.panel, .player-row, .team-row, .feed-row, .match-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.panel {
+  padding: 16px;
+}
+
+.span-4 { grid-column: span 4; }
+.span-5 { grid-column: span 5; }
+.span-6 { grid-column: span 6; }
+.span-7 { grid-column: span 7; }
+.span-8 { grid-column: span 8; }
+.span-12 { grid-column: span 12; }
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.metric {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.metric strong {
+  display: block;
+  font-size: 24px;
+}
+
+.player-list, .feed-list, .team-list, .match-list {
+  display: grid;
+  gap: 8px;
+}
+
+.player-row, .team-row, .feed-row, .match-card {
+  display: grid;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+}
+
+.player-row {
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.player-name {
+  min-width: 0;
+}
+
+.player-name strong, .player-name span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  padding: 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  background: #101719;
+}
+
+.team-row {
+  grid-template-columns: 32px minmax(0, 1fr) 74px 74px;
+}
+
+.rank {
+  color: var(--muted);
+  text-align: center;
+}
+
+.match-card {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.score {
+  font-weight: 900;
+  font-size: 28px;
+}
+
+.right {
+  text-align: right;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+}
+
+.tab-btn {
+  min-height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.tab-btn.active {
+  color: var(--ink);
+  background: var(--gold);
+  border-color: var(--gold);
+  font-weight: 800;
+}
+
+.feed-row {
+  display: block;
+}
+
+.feed-row strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.player-link, .link-btn, .team-title-btn {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 0;
+  text-align: left;
+  font-weight: 800;
+}
+
+.player-link:hover, .link-btn:hover, .team-title-btn:hover {
+  color: var(--green);
+}
+
+.team-title-btn {
+  display: block;
+  font-size: 22px;
+}
+
+.link-btn {
+  display: block;
+}
+
+.link-btn + span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.select {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--text);
+  padding: 0 12px;
+}
+
+.matchup-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.matchup-hero strong, .matchup-hero b {
+  display: block;
+}
+
+.matchup-hero strong {
+  font-size: 22px;
+}
+
+.matchup-hero b {
+  font-size: 34px;
+}
+
+.matchup-spread {
+  display: grid;
+  place-items: center;
+  min-width: 86px;
+  min-height: 44px;
+  border-radius: 8px;
+  font-weight: 900;
+}
+
+.matchup-spread.positive {
+  background: rgba(35, 195, 107, 0.16);
+  color: #7ef0ad;
+}
+
+.matchup-spread.negative {
+  background: rgba(242, 99, 99, 0.16);
+  color: #ffb8b8;
+}
+
+.stat-table-wrap {
+  overflow-x: auto;
+}
+
+.stat-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 460px;
+}
+
+.stat-table th, .stat-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 10px 8px;
+  text-align: left;
+  vertical-align: top;
+  font-size: 13px;
+}
+
+.stat-table th {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.stat-table.dense th, .stat-table.dense td {
+  font-size: 12px;
+  padding: 8px 6px;
+}
+
+.source-note {
+  margin-top: 12px;
+}
+
+.player-context {
+  margin-top: 10px;
+}
+
+.trade-list {
+  display: grid;
+  gap: 8px;
+  max-height: 520px;
+  overflow: auto;
+}
+
+.trade-asset {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  padding: 10px;
+}
+
+.trade-asset strong, .trade-asset small {
+  display: block;
+}
+
+.trade-asset small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.offer-row .actions {
+  justify-content: flex-start;
+  margin-top: 10px;
+}
+
+.mobile-tabs {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .main {
+    padding: 16px 14px 88px;
+  }
+
+  .topbar {
+    align-items: flex-start;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .span-4, .span-5, .span-6, .span-7, .span-8, .span-12 {
+    grid-column: auto;
+  }
+
+  .metric-grid, .score-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .score-strip div {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .score-strip div:last-child {
+    border-bottom: 0;
+  }
+
+  .team-row {
+    grid-template-columns: 28px minmax(0, 1fr) 58px;
+  }
+
+  .team-row .hide-mobile {
+    display: none;
+  }
+
+  .match-card {
+    grid-template-columns: 1fr;
+    text-align: left;
+  }
+
+  .matchup-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .right {
+    text-align: left;
+  }
+
+  .mobile-tabs {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0;
+    border-top: 1px solid var(--line);
+    background: #091012;
+    padding: 8px;
+  }
+
+  .mobile-tabs .nav-item {
+    text-align: center;
+    min-height: 40px;
+    padding: 0 4px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar {
+    display: grid;
+  }
+
+  .actions {
+    justify-content: stretch;
+  }
+
+  .actions button {
+    flex: 1;
+  }
+
+  #stadiumCanvas, .stadium-art {
+    height: 190px;
+  }
+
+  .player-row {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .player-row .row-action {
+    grid-column: 1 / -1;
+  }
+
+  .row-action .mini-btn {
+    width: 100%;
+  }
+}
