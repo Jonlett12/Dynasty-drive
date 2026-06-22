@@ -80,6 +80,7 @@ let selectedPlayerId = null;
 let selectedPlayerSeason = "current";
 let selectedTeamId = "t0";
 let tradePartnerId = "t1";
+let tradeReview = null;
 
 function blankStats() {
   return { passYds: 0, passTd: 0, passInt: 0, rushYds: 0, rushTd: 0, rec: 0, recYds: 0, recTd: 0, fumLost: 0 };
@@ -406,21 +407,57 @@ function completeTrade(fromTeamId, toTeamId, giveIds, receiveIds) {
   });
 }
 
-function sendTradeOffer() {
+function reviewTradeOffer() {
   const giveIds = selectedCheckboxes("tradeGive");
   const receiveIds = selectedCheckboxes("tradeReceive");
   const partner = state.teams.find(team => team.id === tradePartnerId);
+  if (!partner || !giveIds.length || !receiveIds.length) return;
+  tradeReview = {
+    partnerId: partner.id,
+    giveIds,
+    receiveIds
+  };
+  render();
+}
+
+function submitReviewedTrade() {
+  if (!tradeReview) return;
+  const giveIds = tradeReview.giveIds;
+  const receiveIds = tradeReview.receiveIds;
+  const partner = state.teams.find(team => team.id === tradeReview.partnerId);
   const giving = giveIds.map(id => state.players.find(player => player.id === id)).filter(Boolean);
   const receiving = receiveIds.map(id => state.players.find(player => player.id === id)).filter(Boolean);
   if (!partner || !giving.length || !receiving.length) return;
   const evaluation = evaluateTrade(giving, receiving);
   const cpuAccepts = evaluation.outgoing >= evaluation.incoming * 0.91;
-  if (cpuAccepts) {
-    completeTrade("t0", partner.id, giveIds, receiveIds);
-    state.feed.unshift({ title: "Trade accepted", text: `${partner.name} accepted your offer. ${giving.length} asset(s) for ${receiving.length} asset(s).` });
-  } else {
-    state.feed.unshift({ title: "Trade declined", text: `${partner.name} declined. They valued your package at $${evaluation.outgoing} versus $${evaluation.incoming}.` });
-  }
+  const offer = {
+    id: `user-offer-${Date.now()}-${Math.round(Math.random() * 10000)}`,
+    fromTeamId: "t0",
+    toTeamId: partner.id,
+    giveIds,
+    receiveIds,
+    status: cpuAccepts ? "accepted_waiting" : "declined",
+    week: state.week,
+    year: state.year,
+    evaluation
+  };
+  state.tradeOffers.unshift(offer);
+  state.feed.unshift(cpuAccepts
+    ? { title: "Trade agreement ready", text: `${partner.name} accepted your framework. Review and accept the deal to finalize it.` }
+    : { title: "Trade declined", text: `${partner.name} declined. They valued your package at $${evaluation.outgoing} versus $${evaluation.incoming}.` });
+  tradeReview = null;
+  saveState();
+  render();
+}
+
+function finalizeAcceptedDeal(offerId) {
+  const offer = state.tradeOffers.find(item => item.id === offerId);
+  if (!offer || offer.status !== "accepted_waiting") return;
+  completeTrade(offer.fromTeamId, offer.toTeamId, offer.giveIds, offer.receiveIds);
+  offer.status = "completed";
+  const otherTeamId = offer.fromTeamId === "t0" ? offer.toTeamId : offer.fromTeamId;
+  const otherTeam = state.teams.find(team => team.id === otherTeamId);
+  state.feed.unshift({ title: "Trade completed", text: `Deal finalized with ${otherTeam.name}.` });
   saveState();
   render();
 }
@@ -434,9 +471,8 @@ function respondToOffer(offerId, accept) {
   if (!offer || offer.status !== "pending") return;
   const fromTeam = state.teams.find(team => team.id === offer.fromTeamId);
   if (accept) {
-    completeTrade(offer.fromTeamId, offer.toTeamId, offer.giveIds, offer.receiveIds);
-    offer.status = "accepted";
-    state.feed.unshift({ title: "Trade accepted", text: `You accepted ${fromTeam.name}'s offer.` });
+    offer.status = "accepted_waiting";
+    state.feed.unshift({ title: "Trade agreement ready", text: `You accepted ${fromTeam.name}'s offer framework. Accept the deal to finalize it.` });
   } else {
     offer.status = "declined";
     state.feed.unshift({ title: "Trade declined", text: `You declined ${fromTeam.name}'s offer.` });
@@ -707,10 +743,23 @@ function render() {
 function renderHub() {
   const view = document.getElementById("hubView");
   const topPlayers = teamPlayers("t0").slice(0, 5);
+  const pendingTrades = state.tradeOffers.filter(offer => offer.status === "pending" || offer.status === "accepted_waiting").length;
+  const nextPair = matchupPairs().find(([home, away]) => home.id === "t0" || away.id === "t0");
+  const opponent = nextPair[0].id === "t0" ? nextPair[1] : nextPair[0];
+  const topFreeAgent = freeAgents()[0];
   view.innerHTML = `
     <div class="grid">
+      <div class="panel span-12">
+        <div class="section-head"><h2>Dashboard</h2><span class="tag">Week ${state.week}</span></div>
+        <div class="quick-grid">
+          <button class="quick-card" data-view="matchup"><span>Matchup</span><strong>${opponent.name}</strong><small>${projection("t0").toFixed(1)} vs ${projection(opponent.id).toFixed(1)}</small></button>
+          <button class="quick-card" data-view="roster"><span>My Team</span><strong>${state.teams[0].wins}-${state.teams[0].losses}</strong><small>${teamPlayers("t0").length} rostered players</small></button>
+          <button class="quick-card ${pendingTrades ? "urgent" : ""}" data-view="trade"><span>Trades</span><strong>${pendingTrades}</strong><small>pending or ready deals</small></button>
+          <button class="quick-card" data-view="market"><span>Free Agency</span><strong>${topFreeAgent ? topFreeAgent.name : "None"}</strong><small>${topFreeAgent ? `${topFreeAgent.pos} - ${playerPpg(topFreeAgent).toFixed(1)} PPG` : "No players available"}</small></button>
+        </div>
+      </div>
       <div class="panel span-8">
-        <div class="section-head"><h2>Your Week</h2><span class="tag">Week ${state.week}</span></div>
+        <div class="section-head"><h2>Team Snapshot</h2><span class="tag">Full PPR</span></div>
         <div class="metric-grid">
           <div class="metric"><span class="muted">Record</span><strong>${state.teams[0].wins}-${state.teams[0].losses}</strong></div>
           <div class="metric"><span class="muted">Projected PPR</span><strong>${projection("t0").toFixed(1)}</strong></div>
@@ -855,6 +904,8 @@ function renderTrade() {
   const yourRoster = teamPlayers("t0");
   const partnerRoster = teamPlayers(partner.id);
   const pending = state.tradeOffers.filter(offer => offer.status === "pending");
+  const accepted = state.tradeOffers.filter(offer => offer.status === "accepted_waiting");
+  const history = state.tradeOffers.filter(offer => offer.status === "declined" || offer.status === "completed").slice(0, 5);
   view.innerHTML = `
     <div class="grid">
       <div class="panel span-12">
@@ -876,14 +927,50 @@ function renderTrade() {
       </div>
       <div class="panel span-12">
         <div class="section-head">
-          <h2>Submit Offer</h2>
-          <button class="primary-btn" data-send-trade="1">Send Trade</button>
+          <h2>Offer Review</h2>
+          <button class="ghost-btn" data-review-trade="1">Review Offer</button>
         </div>
-        <div class="feed-row"><strong>CPU Decision</strong><span class="muted">The other manager accepts when your package clears their discounted asset value threshold.</span></div>
+        ${renderTradeReview()}
+      </div>
+      <div class="panel span-12">
+        <div class="section-head"><h2>Accepted Deals</h2><span class="tag">${accepted.length} ready</span></div>
+        <div class="feed-list">${accepted.length ? accepted.map(renderAcceptedDeal).join("") : `<div class="feed-row"><strong>No deals awaiting approval</strong><span class="muted">Accepted offers land here before any players move.</span></div>`}</div>
       </div>
       <div class="panel span-12">
         <div class="section-head"><h2>Incoming Offers</h2><span class="tag">${pending.length} pending</span></div>
         <div class="feed-list">${pending.length ? pending.map(renderOffer).join("") : `<div class="feed-row"><strong>No pending offers</strong><span class="muted">CPU managers can send offers after weeks advance.</span></div>`}</div>
+      </div>
+      <div class="panel span-12">
+        <div class="section-head"><h2>Trade Log</h2><span class="tag">${history.length} recent</span></div>
+        <div class="feed-list">${history.length ? history.map(renderTradeHistory).join("") : `<div class="feed-row"><strong>No completed or declined offers yet</strong><span class="muted">Your league activity appears here.</span></div>`}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderTradeReview() {
+  if (!tradeReview) {
+    return `<div class="feed-row"><strong>Select assets first</strong><span class="muted">Pick players from each side, then review. Nothing is sent until you submit from this panel.</span></div>`;
+  }
+  const partner = state.teams.find(team => team.id === tradeReview.partnerId);
+  const giving = tradeReview.giveIds.map(id => state.players.find(player => player.id === id)).filter(Boolean);
+  const receiving = tradeReview.receiveIds.map(id => state.players.find(player => player.id === id)).filter(Boolean);
+  const evaluation = evaluateTrade(giving, receiving);
+  const interest = Math.max(0, Math.min(100, Math.round((evaluation.outgoing / Math.max(1, evaluation.incoming * 0.91)) * 100)));
+  return `
+    <div class="trade-review">
+      <div>
+        <strong>You send</strong>
+        <span class="muted">${giving.map(player => player.name).join(", ")}</span>
+      </div>
+      <div>
+        <strong>${partner.name} sends</strong>
+        <span class="muted">${receiving.map(player => player.name).join(", ")}</span>
+      </div>
+      <div class="interest-meter"><span style="width:${interest}%"></span></div>
+      <div class="section-head review-actions">
+        <span class="tag">Interest ${interest}% - You $${evaluation.outgoing} / Them $${evaluation.incoming}</span>
+        <button class="primary-btn" data-submit-reviewed-trade="1">Submit Offer</button>
       </div>
     </div>
   `;
@@ -920,6 +1007,28 @@ function renderOffer(offer) {
       </div>
     </div>
   `;
+}
+
+function renderAcceptedDeal(offer) {
+  const fromTeam = state.teams.find(team => team.id === offer.fromTeamId);
+  const toTeam = state.teams.find(team => team.id === offer.toTeamId);
+  const giving = offer.giveIds.map(id => state.players.find(player => player.id === id)).filter(Boolean);
+  const receiving = offer.receiveIds.map(id => state.players.find(player => player.id === id)).filter(Boolean);
+  return `
+    <div class="feed-row offer-row">
+      <strong>${fromTeam.name} and ${toTeam.name} have an agreement</strong>
+      <span class="muted">${fromTeam.name} sends ${giving.map(player => player.name).join(", ")}. ${toTeam.name} sends ${receiving.map(player => player.name).join(", ")}.</span>
+      <div class="actions">
+        <button class="primary-btn mini-btn" data-finalize-offer="${offer.id}">Accept Deal</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderTradeHistory(offer) {
+  const fromTeam = state.teams.find(team => team.id === offer.fromTeamId);
+  const toTeam = state.teams.find(team => team.id === offer.toTeamId);
+  return `<div class="feed-row"><strong>${offer.status === "completed" ? "Completed" : "Declined"} trade</strong><span class="muted">${fromTeam?.name || "Team"} and ${toTeam?.name || "Team"} - Week ${offer.week}, ${offer.year}</span></div>`;
 }
 
 function renderLeague() {
@@ -1194,7 +1303,9 @@ document.addEventListener("click", event => {
     setView("team");
   }
   if (target.dataset.backView) setView(target.dataset.backView);
-  if (target.dataset.sendTrade) sendTradeOffer();
+  if (target.dataset.reviewTrade) reviewTradeOffer();
+  if (target.dataset.submitReviewedTrade) submitReviewedTrade();
+  if (target.dataset.finalizeOffer) finalizeAcceptedDeal(target.dataset.finalizeOffer);
   if (target.dataset.acceptOffer) respondToOffer(target.dataset.acceptOffer, true);
   if (target.dataset.declineOffer) respondToOffer(target.dataset.declineOffer, false);
   if (target.dataset.waive) waive(target.dataset.waive);

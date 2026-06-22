@@ -500,6 +500,43 @@ h3 {
   margin-top: 10px;
 }
 
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.quick-card {
+  display: block;
+  min-height: 112px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--text);
+  padding: 14px;
+  text-align: left;
+}
+
+.quick-card:hover {
+  border-color: var(--green);
+}
+
+.quick-card.urgent {
+  border-color: var(--gold);
+}
+
+.quick-card span, .quick-card small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.quick-card strong {
+  display: block;
+  margin: 8px 0 4px;
+  font-size: 20px;
+}
+
 .trade-list {
   display: grid;
   gap: 8px;
@@ -530,6 +567,29 @@ h3 {
 .offer-row .actions {
   justify-content: flex-start;
   margin-top: 10px;
+}
+
+.trade-review {
+  display: grid;
+  gap: 12px;
+}
+
+.interest-meter {
+  height: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #0d1416;
+}
+
+.interest-meter span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--red), var(--gold), var(--green));
+}
+
+.review-actions {
+  margin-bottom: 0;
 }
 
 .mobile-tabs {
@@ -563,6 +623,10 @@ h3 {
 
   .metric-grid, .score-strip {
     grid-template-columns: 1fr;
+  }
+
+  .quick-grid {
+    grid-template-columns: 1fr 1fr;
   }
 
   .score-strip div {
@@ -644,5 +708,9 @@ h3 {
 
   .row-action .mini-btn {
     width: 100%;
+  }
+
+  .quick-grid {
+    grid-template-columns: 1fr;
   }
 }
