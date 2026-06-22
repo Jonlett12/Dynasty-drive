@@ -1,4 +1,6 @@
 const STORAGE_KEY = "dynasty-drive-stat-sim-v2";
+const PROFILE_INDEX_KEY = "dynasty-drive-profile-index-v1";
+const ACTIVE_PROFILE_KEY = "dynasty-drive-active-profile-v1";
 
 const teamNames = [
   "Gridiron Syndicate", "Red Zone Union", "Fourth & Gold", "End Zone Equity",
@@ -114,18 +116,20 @@ function makePlayer(row, index) {
     last: 0,
     games: 0,
     teamId: null,
+    draftPick: null,
+    adp: 0,
     salary: Math.max(3, Math.round(statPoints(base) / 18))
   };
 }
 
 function generatedDepthPlayers(startIndex) {
-  const first = ["Avery", "Miles", "Theo", "Cal", "Jalen", "Nico", "Drew", "Rafe", "Kai", "Owen", "Zion", "Grant"];
-  const last = ["Cross", "Reed", "Sharp", "Brooks", "Voss", "Stone", "Wilder", "Knox", "Mercer", "Vale", "Hart", "Pike"];
+  const first = ["Avery", "Miles", "Theo", "Cal", "Jalen", "Nico", "Drew", "Rafe", "Kai", "Owen", "Zion", "Grant", "Luca", "Noah", "Eli", "Roman", "Finn", "Cole", "Micah", "Ezra", "Mason", "Julian", "Ty", "Beau", "Asher", "Isaac", "Leo", "Cam"];
+  const last = ["Cross", "Reed", "Sharp", "Brooks", "Voss", "Stone", "Wilder", "Knox", "Mercer", "Vale", "Hart", "Pike", "Frost", "Crest", "Maddox", "West", "Archer", "Rivers", "Lane", "Holt", "Drake", "North", "Shaw", "Carter", "Field", "Storm", "King", "Sutton"];
   const positions = ["QB", "RB", "RB", "WR", "WR", "WR", "TE"];
   return Array.from({ length: 56 }, (_, i) => {
     const pos = positions[i % positions.length];
     const tier = i % 4;
-    const name = `${first[i % first.length]} ${last[(i * 5) % last.length]} ${Math.floor(i / first.length) + 1}`;
+    const name = `${first[i % first.length]} ${last[(i * 5 + Math.floor(i / first.length)) % last.length]}`;
     const base = blankStats();
     if (pos === "QB") {
       base.passYds = 2600 - tier * 260;
@@ -168,6 +172,8 @@ function generatedDepthPlayers(startIndex) {
       last: 0,
       games: 0,
       teamId: null,
+      draftPick: null,
+      adp: 0,
       salary: Math.max(2, Math.round(statPoints(base) / 20))
     };
   });
@@ -191,7 +197,7 @@ function freshState() {
     color: palette[index % palette.length]
   }));
 
-  draftRosters(players, teams);
+  const draftLog = draftRosters(players, teams);
 
   return {
     year: 2026,
@@ -201,6 +207,9 @@ function freshState() {
     sourceUrl: "https://www.pro-football-reference.com/years/2023/fantasy.htm",
     archives: {},
     tradeOffers: [],
+    managerName: "You",
+    profileName: getActiveProfileName(),
+    draftLog,
     teams,
     players,
     feed: [
@@ -211,34 +220,109 @@ function freshState() {
   };
 }
 
+function simulatedAdp(player, index) {
+  const positionalPremium = { RB: 10, WR: 8, QB: 4, TE: 3 }[player.pos] || 0;
+  const youthBoost = Math.max(-8, 30 - player.age);
+  const injuryPenalty = player.injuryConcern * 18;
+  const scheduleBoost = (player.scheduleRating - 1) * 14;
+  return Number((220 - statPoints(player.template) * 0.45 - positionalPremium - youthBoost - scheduleBoost + injuryPenalty + index * 0.08).toFixed(1));
+}
+
 function draftRosters(players, teams) {
-  const sorted = [...players].sort((a, b) => statPoints(b.template) - statPoints(a.template));
-  sorted.slice(0, 80).forEach((player, index) => {
-    player.teamId = teams[index % teams.length].id;
+  const draftPool = [...players].sort((a, b) => {
+    const aAdp = simulatedAdp(a, Number(a.id.replace("p", "")));
+    const bAdp = simulatedAdp(b, Number(b.id.replace("p", "")));
+    a.adp = aAdp;
+    b.adp = bAdp;
+    return aAdp - bAdp;
   });
+  const rounds = 10;
+  const log = [];
+  let pick = 1;
+  for (let round = 1; round <= rounds; round++) {
+    const order = round % 2 === 1 ? teams : [...teams].reverse();
+    for (const team of order) {
+      const player = draftPool.shift();
+      if (!player) break;
+      player.teamId = team.id;
+      player.draftPick = pick;
+      log.push({ pick, round, teamId: team.id, playerId: player.id, adp: player.adp });
+      pick += 1;
+    }
+  }
+  players.forEach((player, index) => {
+    if (!player.adp) player.adp = simulatedAdp(player, index);
+  });
+  return log;
 }
 
 function loadState() {
   try {
+    const activeProfile = getActiveProfileName();
+    const profileKey = profileStorageKey(activeProfile);
+    const profileSaved = localStorage.getItem(profileKey);
+    if (profileSaved) return migrateState(JSON.parse(profileSaved));
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? migrateState(JSON.parse(saved)) : freshState();
+    const loaded = saved ? migrateState(JSON.parse(saved)) : freshState();
+    loaded.profileName = activeProfile;
+    saveProfileState(activeProfile, loaded);
+    return loaded;
   } catch {
     return freshState();
   }
 }
 
+function profileStorageKey(profileName) {
+  return `${STORAGE_KEY}::profile::${profileName}`;
+}
+
+function getProfiles() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PROFILE_INDEX_KEY) || "[]");
+    return Array.isArray(saved) && saved.length ? saved : ["Main League"];
+  } catch {
+    return ["Main League"];
+  }
+}
+
+function setProfiles(profiles) {
+  localStorage.setItem(PROFILE_INDEX_KEY, JSON.stringify([...new Set(profiles)].filter(Boolean)));
+}
+
+function getActiveProfileName() {
+  const active = localStorage.getItem(ACTIVE_PROFILE_KEY);
+  const profiles = getProfiles();
+  return active || profiles[0] || "Main League";
+}
+
+function setActiveProfileName(profileName) {
+  const profiles = getProfiles();
+  if (!profiles.includes(profileName)) setProfiles([...profiles, profileName]);
+  localStorage.setItem(ACTIVE_PROFILE_KEY, profileName);
+}
+
+function saveProfileState(profileName, stateToSave) {
+  localStorage.setItem(profileStorageKey(profileName), JSON.stringify(stateToSave));
+}
+
 function migrateState(saved) {
   const fresh = freshState();
   if (!saved || !Array.isArray(saved.players) || !Array.isArray(saved.teams)) return fresh;
+  const needsStartupDraft = !Array.isArray(saved.draftLog) || !saved.draftLog.length;
   saved.archives ||= {};
   saved.tradeOffers ||= [];
+  saved.draftLog ||= fresh.draftLog || [];
+  saved.managerName ||= "You";
+  saved.profileName ||= getActiveProfileName();
   saved.scoring ||= "Full PPR";
   saved.sourceUrl ||= "https://www.pro-football-reference.com/years/2023/fantasy.htm";
   saved.players = saved.players.map(player => {
-    const seed = fresh.players.find(item => item.id === player.id || item.name === player.name);
+    const cleanedName = cleanGeneratedName(player.name);
+    const seed = fresh.players.find(item => item.id === player.id || item.name === cleanedName || cleanGeneratedName(item.name) === cleanedName);
     const template = player.template || seed?.template || blankStats();
     return {
       ...player,
+      name: cleanedName,
       source: player.source || seed?.source || "Simulated stat feed",
       age: Number(player.age || seed?.age || 25),
       injuryConcern: Number(player.injuryConcern ?? seed?.injuryConcern ?? 0.12),
@@ -251,13 +335,31 @@ function migrateState(saved) {
       gameLogs: Array.isArray(player.gameLogs) ? player.gameLogs : [],
       points: Number(player.points || 0),
       last: Number(player.last || 0),
-      games: Number(player.games || 0)
+      games: Number(player.games || 0),
+      draftPick: player.draftPick || seed?.draftPick || null,
+      adp: Number(player.adp || seed?.adp || simulatedAdp({ ...player, template, age: player.age || seed?.age || 25, injuryConcern: player.injuryConcern ?? seed?.injuryConcern ?? 0.12, scheduleRating: player.scheduleRating ?? seed?.scheduleRating ?? 1, pos: player.pos }, Number(String(player.id || "p0").replace("p", ""))))
     };
   });
+  if (needsStartupDraft) {
+    saved.players.forEach(player => {
+      player.teamId = null;
+      player.draftPick = null;
+    });
+    saved.draftLog = draftRosters(saved.players, saved.teams);
+    saved.feed ||= [];
+    saved.feed.unshift({ title: "Startup draft completed", text: "Rosters were rebuilt with a simulated ADP snake draft." });
+  }
   return saved;
 }
 
+function cleanGeneratedName(name) {
+  return String(name || "").replace(/\s+\d+$/, "");
+}
+
 function saveState() {
+  const profileName = state.profileName || getActiveProfileName();
+  state.profileName = profileName;
+  saveProfileState(profileName, state);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
@@ -687,7 +789,29 @@ function sign(playerId) {
 }
 
 function resetGame() {
+  const profileName = state.profileName || getActiveProfileName();
   state = freshState();
+  state.profileName = profileName;
+  saveState();
+  render();
+}
+
+function createNewProfile() {
+  const existing = getProfiles();
+  const profileName = window.prompt("Name this save", `League ${existing.length + 1}`);
+  if (!profileName) return;
+  setActiveProfileName(profileName);
+  state = freshState();
+  state.profileName = profileName;
+  saveState();
+  render();
+}
+
+function switchProfile(profileName) {
+  setActiveProfileName(profileName);
+  const saved = localStorage.getItem(profileStorageKey(profileName));
+  state = saved ? migrateState(JSON.parse(saved)) : freshState();
+  state.profileName = profileName;
   saveState();
   render();
 }
@@ -706,7 +830,7 @@ function playerCard(player, action = "") {
       <div class="avatar" style="background:${color}">${initials}</div>
       <div class="player-name">
         <button class="player-link" data-player="${player.id}">${player.name}</button>
-        <span class="muted">${player.pos} - ${player.nflTeam} - ${playerLine(player)} - ${player.points.toFixed(1)} pts</span>
+        <span class="muted">${player.pos} - ${player.nflTeam} - ADP ${Number(player.adp || 0).toFixed(1)} - Pick ${player.draftPick || "FA"} - ${player.points.toFixed(1)} pts</span>
       </div>
       <div class="row-action">${action}</div>
     </div>
@@ -737,7 +861,16 @@ function render() {
   renderLeague();
   renderPlayer();
   renderTeam();
+  renderProfileControls();
   drawStadium();
+}
+
+function renderProfileControls() {
+  const select = document.getElementById("profileSelect");
+  if (!select) return;
+  const profiles = getProfiles();
+  const active = state.profileName || getActiveProfileName();
+  select.innerHTML = profiles.map(profile => `<option value="${profile}" ${profile === active ? "selected" : ""}>${profile}</option>`).join("");
 }
 
 function renderHub() {
@@ -778,6 +911,28 @@ function renderHub() {
         <div class="section-head"><h2>Activity</h2></div>
         <div class="feed-list">${state.feed.slice(0, 6).map(item => `<div class="feed-row"><strong>${item.title}</strong><span class="muted">${item.text}</span></div>`).join("")}</div>
       </div>
+      <div class="panel span-12">
+        <div class="section-head"><h2>Startup Snake Draft</h2><span class="tag">Simulated ADP</span></div>
+        ${draftLogTable(12)}
+      </div>
+    </div>
+  `;
+}
+
+function draftLogTable(limit = 80) {
+  const rows = (state.draftLog || []).slice(0, limit);
+  return `
+    <div class="stat-table-wrap">
+      <table class="stat-table dense">
+        <thead><tr><th>Pick</th><th>Round</th><th>Team</th><th>Player</th><th>ADP</th></tr></thead>
+        <tbody>
+          ${rows.map(pick => {
+            const team = state.teams.find(item => item.id === pick.teamId);
+            const player = state.players.find(item => item.id === pick.playerId);
+            return `<tr><td>${pick.pick}</td><td>${pick.round}</td><td>${team?.name || ""}</td><td><button class="link-btn" data-player="${player?.id || ""}">${player?.name || ""}</button></td><td>${Number(pick.adp || player?.adp || 0).toFixed(1)}</td></tr>`;
+          }).join("")}
+        </tbody>
+      </table>
     </div>
   `;
 }
@@ -1056,6 +1211,10 @@ function renderLeague() {
           <div class="feed-row"><strong>Source Shape</strong><span class="muted">Seed columns mirror Pro Football Reference fantasy tables; live scraping is blocked by Cloudflare.</span></div>
         </div>
       </div>
+      <div class="panel span-12">
+        <div class="section-head"><h2>Draft Board</h2><span class="tag">Snake draft</span></div>
+        ${draftLogTable(80)}
+      </div>
     </div>
   `;
 }
@@ -1321,9 +1480,13 @@ document.addEventListener("change", event => {
     tradePartnerId = event.target.value;
     render();
   }
+  if (event.target.id === "profileSelect") {
+    switchProfile(event.target.value);
+  }
 });
 
 document.getElementById("advanceBtn").addEventListener("click", advanceWeek);
 document.getElementById("resetBtn").addEventListener("click", resetGame);
+document.getElementById("newProfileBtn").addEventListener("click", createNewProfile);
 
 setView("hub");
